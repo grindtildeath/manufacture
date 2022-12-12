@@ -13,6 +13,14 @@
                     name="mo_auto_validation"
                     attrs="{'invisible': [('type', '!=', 'normal')]}"
                 />
+        <field
+                    name="mo_auto_validation_warning"
+                    nolabel="1"
+                    colspan="2"
+                    class="alert alert-warning"
+                    role="alert"
+                    attrs="{'invisible': ['|', ('type', '!=', 'normal'), ('mo_auto_validation', '=', False)]}"
+                />
       </field>
     </field>
   </record>

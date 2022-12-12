@@ -3,7 +3,7 @@
 
 import logging
 
-from odoo import api, fields, models
+from odoo import _, api, exceptions, fields, models, tools
 
 _logger = logging.getLogger(__name__)
 
@@ -16,11 +16,33 @@ class MrpProduction(models.Model):
         default=False,
     )
 
+    @api.constrains("bom_id", "auto_validate", "product_qty")
+    def check_bom_auto_validate(self):
+        for mo in self:
+            qty_ok = (
+                tools.float_compare(
+                    mo.product_qty,
+                    mo.bom_id.product_qty,
+                    precision_rounding=mo.product_uom_id.rounding,
+                )
+                == 0
+            )
+            bypass_check = self.env.context.get("disable_check_mo_auto_validate")
+            if bypass_check:
+                return
+            if mo.bom_id and mo.auto_validate and not qty_ok:
+                raise exceptions.ValidationError(
+                    _(
+                        "The quantity to produce is restricted to {qty} "
+                        "as the BoM is configured with the "
+                        "'Order Auto Validation' option."
+                    ).format(qty=mo.bom_id.product_qty)
+                )
+
     @api.onchange("bom_id")
     def _onchange_bom_id(self):
         res = super()._onchange_bom_id()
-        if self.bom_id.mo_auto_validation:
-            self.auto_validate = True
+        self.auto_validate = self.bom_id.mo_auto_validation
         return res
 
     def _auto_validate_after_picking(self):
