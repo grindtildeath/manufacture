@@ -87,3 +87,38 @@ class MrpProduction(models.Model):
         )
         wiz = wiz_model.create({})
         return wiz.action_backorder()
+
+    @api.model_create_multi
+    def create(self, values_list):
+        new_values_list = []
+        bom_ids_no_auto_validation = set()
+        for values in values_list:
+            bom_id = values.get("bom_id")
+            if not bom_id:
+                new_values_list.append(values)
+                continue
+            bom = self.env["mrp.bom"].browse(bom_id)
+            if not bom.mo_auto_validation:
+                new_values_list.append(values)
+                continue
+            create_qty = values.get("product_qty")
+            # TODO: Handle UOM?
+            bom_qty = bom.product_qty
+            # TODO Use float comparisons?
+            if create_qty == bom_qty:
+                new_values_list.append(values)
+                continue
+            elif create_qty < bom_qty:
+                # TODO: What should be done in such case?
+                values["product_qty"] = bom_qty
+                # TODO: Post messages on MO to explain why qty was raised?
+                new_values_list.append(values)
+                continue
+            # If we get here we need to split the prepared MO values
+            #  into multiple MO values to respect BOM qty
+            while create_qty > 0:
+                new_values = values.copy()
+                new_values["product_qty"] = bom_qty
+                new_values_list.append(new_values)
+                create_qty -= bom_qty
+        return super().create(new_values_list)
