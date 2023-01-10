@@ -13,7 +13,9 @@ class MrpProduction(models.Model):
 
     auto_validate = fields.Boolean(
         string="Auto Validate",
-        default=False,
+        compute="_compute_auto_validate",
+        store=True,
+        readonly=False,
     )
 
     @api.constrains("bom_id", "auto_validate", "product_qty")
@@ -39,11 +41,12 @@ class MrpProduction(models.Model):
                     ).format(qty=mo.bom_id.product_qty)
                 )
 
-    @api.onchange("bom_id")
-    def _onchange_bom_id(self):
-        res = super()._onchange_bom_id()
-        self.auto_validate = self.bom_id.mo_auto_validation
-        return res
+    @api.depends("bom_id.mo_auto_validation", "state")
+    def _compute_auto_validate(self):
+        for prod in self:
+            if prod.state != "draft":
+                continue
+            prod.auto_validate = prod.bom_id.mo_auto_validation
 
     def _auto_validate_after_picking(self):
         self.ensure_one()
