@@ -112,11 +112,14 @@ class MrpProduction(models.Model):
             bom_uom = bom.product_uom_id
             if create_uom != bom_uom:
                 create_qty = create_uom._compute_quantity(create_qty, bom_uom)
-            # TODO Use float comparisons?
-            if create_qty == bom_qty:
+            if tools.float_compare(
+                create_qty, bom_qty, precision_rounding=bom_uom.rounding
+            ) == 0:
                 new_values_list.append(values)
                 continue
-            elif create_qty < bom_qty:
+            elif tools.float_compare(
+                create_qty, bom_qty, precision_rounding=bom_uom.rounding
+            ) < 0:
                 # TODO: What should be done in such case?
                 values["product_qty"] = bom_qty
                 values["product_uom_id"] = bom_uom.id
@@ -125,7 +128,9 @@ class MrpProduction(models.Model):
                 continue
             # If we get here we need to split the prepared MO values
             #  into multiple MO values to respect BOM qty
-            while create_qty > 0:
+            while tools.float_compare(
+                create_qty, 0, precision_rounding=bom_uom.rounding
+            ) > 0:
                 new_values = values.copy()
                 new_values["product_qty"] = bom_qty
                 values["product_uom_id"] = bom_uom.id
