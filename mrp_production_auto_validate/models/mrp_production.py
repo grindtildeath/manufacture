@@ -90,6 +90,11 @@ class MrpProduction(models.Model):
 
     @api.model_create_multi
     def create(self, values_list):
+        new_values_list = self.split_values_for_auto_validation(values_list)
+        return super().create(new_values_list)
+
+    @api.model
+    def split_values_for_auto_validation(self, values_list):
         new_values_list = []
         bom_ids_no_auto_validation = set()
         for values in values_list:
@@ -121,4 +126,4 @@ class MrpProduction(models.Model):
                 new_values["product_qty"] = bom_qty
                 new_values_list.append(new_values)
                 create_qty -= bom_qty
-        return super().create(new_values_list)
+        return new_values_list
