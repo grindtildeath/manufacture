@@ -100,9 +100,10 @@ class MrpProduction(models.Model):
 
     @api.model
     def split_values_for_auto_validation(self, values_list):
-        new_values_list = []
         messages_to_post = {}
-        bom_ids_no_auto_validation = set()
+        if not self.env.context.get("_split_create_values_for_auto_validation"):
+            return values_list, messages_to_post
+        new_values_list = []
         for values in values_list:
             bom_id = values.get("bom_id")
             if not bom_id:
