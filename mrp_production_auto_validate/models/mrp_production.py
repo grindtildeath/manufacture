@@ -21,6 +21,7 @@ class MrpProduction(models.Model):
     @api.constrains("bom_id", "auto_validate", "product_qty")
     def check_bom_auto_validate(self):
         for mo in self:
+            # FIXME: Handle different UOM between BOM and MO
             qty_ok = (
                 tools.float_compare(
                     mo.product_qty,
