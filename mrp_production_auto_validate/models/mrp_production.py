@@ -107,8 +107,11 @@ class MrpProduction(models.Model):
                 new_values_list.append(values)
                 continue
             create_qty = values.get("product_qty")
-            # TODO: Handle UOM?
+            create_uom = self.env["uom.uom"].browse(values.get("product_uom_id"))
             bom_qty = bom.product_qty
+            bom_uom = bom.product_uom_id
+            if create_uom != bom_uom:
+                create_qty = create_uom._compute_quantity(create_qty, bom_uom)
             # TODO Use float comparisons?
             if create_qty == bom_qty:
                 new_values_list.append(values)
@@ -116,6 +119,7 @@ class MrpProduction(models.Model):
             elif create_qty < bom_qty:
                 # TODO: What should be done in such case?
                 values["product_qty"] = bom_qty
+                values["product_uom_id"] = bom_uom.id
                 # TODO: Post messages on MO to explain why qty was raised?
                 new_values_list.append(values)
                 continue
@@ -124,6 +128,7 @@ class MrpProduction(models.Model):
             while create_qty > 0:
                 new_values = values.copy()
                 new_values["product_qty"] = bom_qty
+                values["product_uom_id"] = bom_uom.id
                 new_values_list.append(new_values)
                 create_qty -= bom_qty
         return new_values_list
