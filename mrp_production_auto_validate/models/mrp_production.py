@@ -90,12 +90,18 @@ class MrpProduction(models.Model):
 
     @api.model_create_multi
     def create(self, values_list):
-        new_values_list = self.split_values_for_auto_validation(values_list)
-        return super().create(new_values_list)
+        new_values_list, messages_to_post = self.split_values_for_auto_validation(values_list)
+        res = super().create(new_values_list)
+        if messages_to_post:
+            for pos, msg in messages_to_post.items():
+                prod = res[pos]
+                prod.message_post(body=msg)
+        return res
 
     @api.model
     def split_values_for_auto_validation(self, values_list):
         new_values_list = []
+        messages_to_post = {}
         bom_ids_no_auto_validation = set()
         for values in values_list:
             bom_id = values.get("bom_id")
@@ -120,10 +126,15 @@ class MrpProduction(models.Model):
             elif tools.float_compare(
                 create_qty, bom_qty, precision_rounding=bom_uom.rounding
             ) < 0:
-                # TODO: What should be done in such case?
+                procure_qty = values.get("product_qty")
                 values["product_qty"] = bom_qty
                 values["product_uom_id"] = bom_uom.id
-                # TODO: Post messages on MO to explain why qty was raised?
+                msg = _(
+                    "Quantity in procurement (%s %s) was raised to %s %s due to auto "
+                    "validation feature preventing to create an MO with a different "
+                    "qty than defined on the BOM."
+                ) % (procure_qty, create_uom.display_name, bom_qty, bom_uom.display_name)
+                messages_to_post[len(new_values_list)] = msg
                 new_values_list.append(values)
                 continue
             # If we get here we need to split the prepared MO values
@@ -133,7 +144,19 @@ class MrpProduction(models.Model):
             ) > 0:
                 new_values = values.copy()
                 new_values["product_qty"] = bom_qty
-                values["product_uom_id"] = bom_uom.id
+                new_values["product_uom_id"] = bom_uom.id
+                msg = _(
+                    "Quantity in procurement (%s %s) was split to multiple production "
+                    "orders of %s %s due to auto validation feature preventing to "
+                    "set a quantity to produce different than the quantity defined "
+                    "on the Bill of Materials."
+                ) % (
+                    values.get("product_qty"),
+                    create_uom.display_name,
+                    bom_qty,
+                    bom_uom.display_name
+                )
+                messages_to_post[len(new_values_list)] = msg
                 new_values_list.append(new_values)
                 create_qty -= bom_qty
-        return new_values_list
+        return new_values_list, messages_to_post
