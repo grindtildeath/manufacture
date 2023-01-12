@@ -104,7 +104,17 @@ class MrpProduction(models.Model):
         return res
 
     @api.model
-    def split_values_for_auto_validation(self, values_list):
+    def adapt_values_qty_for_auto_validation(self, values_list):
+        """Adapt create values according to qty with auto validated BOM
+
+        If MOs are to be created with a BOM having auto validation, we must ensure
+        the quantity of the MO is equal to the quantity of the BOM.
+        However when MOs are created through procurements, the requested quantity
+        if based on the procurement quantity, so we should either
+          * raise the quantity to match the BOM if procurement value is lower
+          * split the values to create one MO into multiple values to create multiple
+          MOs matching the BOM quantity if procurement value is bigger
+        """
         messages_to_post = {}
         if not self.env.context.get("_split_create_values_for_auto_validation"):
             return values_list, messages_to_post
