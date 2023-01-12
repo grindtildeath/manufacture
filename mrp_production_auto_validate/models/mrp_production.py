@@ -15,7 +15,7 @@ class MrpProduction(models.Model):
         string="Auto Validate",
         compute="_compute_auto_validate",
         store=True,
-        readonly=False,
+        states={'draft': [('readonly', False)]},
     )
 
     @api.constrains("bom_id", "auto_validate", "product_qty")
@@ -46,6 +46,10 @@ class MrpProduction(models.Model):
     def _compute_auto_validate(self):
         for prod in self:
             if prod.state != "draft":
+                # Avoid recomputing the value once the MO is confirmed.
+                # e.g. if the value changes on the BOM but the MO was already confirmed,
+                # or if the user forces another value while the MO is in draft,
+                # we don't want to change the value after confirmation.
                 continue
             prod.auto_validate = prod.bom_id.mo_auto_validation
 
