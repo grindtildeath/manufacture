@@ -95,7 +95,7 @@ class MrpProduction(models.Model):
 
     @api.model_create_multi
     def create(self, values_list):
-        new_values_list, messages_to_post = self.split_values_for_auto_validation(values_list)
+        new_values_list, messages_to_post = self.adapt_values_qty_for_auto_validation(values_list)
         res = super().create(new_values_list)
         if messages_to_post:
             for pos, msg in messages_to_post.items():
