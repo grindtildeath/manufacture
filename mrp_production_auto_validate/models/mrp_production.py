@@ -110,8 +110,8 @@ class MrpProduction(models.Model):
         If MOs are to be created with a BOM having auto validation, we must ensure
         the quantity of the MO is equal to the quantity of the BOM.
         However when MOs are created through procurements, the requested quantity
-        if based on the procurement quantity, so we should either
-          * raise the quantity to match the BOM if procurement value is lower
+        is based on the procurement quantity, so we should either
+          * increase the quantity to match the BOM if procurement value is lower
           * split the values to create one MO into multiple values to create multiple
           MOs matching the BOM quantity if procurement value is bigger
         """
@@ -146,7 +146,7 @@ class MrpProduction(models.Model):
                 values["product_qty"] = bom_qty
                 values["product_uom_id"] = bom_uom.id
                 msg = _(
-                    "Quantity in procurement (%s %s) was raised to %s %s due to auto "
+                    "Quantity in procurement (%s %s) was increased to %s %s due to auto "
                     "validation feature preventing to create an MO with a different "
                     "qty than defined on the BOM."
                 ) % (procure_qty, create_uom.display_name, bom_qty, bom_uom.display_name)
