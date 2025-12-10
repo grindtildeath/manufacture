@@ -64,6 +64,23 @@ class TestMrpProduction(Common):
         form.product_qty = qty
         return form.save()
 
+    def _init_inventory(cls, product, location, qty=1, lot_name=None):
+        lot = None
+        if lot_name:
+            lot = cls.env["stock.lot"].search(
+                [("product_id", "=", product.id), ("name", "=", lot_name)]
+            )
+            if not lot:
+                lot = cls.env["stock.lot"].create(
+                    {"name": lot_name, "product_id": product.id}
+                )
+        cls.env["stock.quant"]._update_available_quantity(
+            product,
+            location,
+            quantity=qty,
+            lot_id=lot,
+        )
+
     def _set_qty_done(self, order):
         for line in order.move_raw_ids.move_line_ids:
             line.quantity = line.quantity_product_uom
@@ -234,17 +251,10 @@ class TestMrpProduction(Common):
         )
         # Init component stock
         for i in range(5):
-            lot = self.env["stock.lot"].create(
-                {
-                    "name": "SN-000%d" % i,
-                    "product_id": self.component_propagated_product.id,
-                }
-            )
-            self.env["stock.quant"]._update_available_quantity(
+            self._init_inventory(
                 self.component_propagated_product,
                 self.stock_location,
-                quantity=1.0,
-                lot_id=lot,
+                lot_name="SN-000%d" % i,
             )
         order.action_confirm()
         components_serials = order.move_raw_ids.filtered("propagate_lot_number").mapped(
@@ -265,3 +275,35 @@ class TestMrpProduction(Common):
                 backorder.lot_producing_id.name,
                 propagating_move.move_line_ids.lot_id.name,
             )
+
+    def test_scrap_after_mass_produce_split(self):
+        order = self._create_order(
+            self.finished_propagated_product, self.propagate_bom, qty=5
+        )
+        # Init component stock
+        for i in range(10):
+            self._init_inventory(
+                self.component_propagated_product,
+                self.stock_location,
+                lot_name="SN-000%d" % i,
+            )
+        order.action_confirm()
+        components_serials = order.move_raw_ids.filtered("propagate_lot_number").mapped(
+            "move_line_ids.lot_id"
+        )
+        self.assertEqual(len(components_serials), 5)
+        self.assertEqual(len(order.procurement_group_id.mrp_production_ids), 1)
+        batch_propagate_action = order.button_mark_done()
+        self.assertEqual(
+            batch_propagate_action["res_model"], "mrp.batch.produce.propagate"
+        )
+        wiz = (
+            self.env[batch_propagate_action["res_model"]]
+            .with_context(**batch_propagate_action["context"])
+            .create({})
+        )
+        wiz.action_prepare()
+        self.assertEqual(len(order.procurement_group_id.mrp_production_ids), 5)
+        for mo in order.procurement_group_id.mrp_production_ids:
+            self.assertEqual(mo.state, "confirmed")
+            self.assertFalse(mo.lot_producing_id)
